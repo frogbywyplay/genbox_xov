@@ -1,0 +1,178 @@
+#!/usr/bin/python 
+
+import sys
+import os
+from optparse import OptionParser, Option, OptionGroup
+
+from xtarget.current import get_current_target
+from xutils import die, error, warn, info, verbose, color, is_verbose
+from xov.xov import Xov, XovError
+
+options_defaults = [
+	Option('-v', '--verbose',
+		action='store_true',
+		dest='verbose',
+		help='Turn on verbose mode'),
+	Option('', '--cfg-dir',
+		dest='cfg_dir',
+		help='Path to portage configuration file'),
+	Option('', '--ov-dir',
+		dest='ov_dir',
+		help='Path to store overlay'),
+		]
+
+
+options_list = options_defaults
+
+options_add = options_defaults + [
+	Option('', '--uri',
+		dest='uri',
+		help='Overlay URI'),
+	Option('', '--proto',
+		dest='proto',
+		help='Overlay protocol'),
+	Option('', '--rev',
+		dest='rev',
+		help='Overlay revision'),
+	Option('', '--branch',
+		dest='branch',
+		help='Overlay branch'),
+	Option('', '--xml',
+		dest='xml',
+		help='XML file describing overlay'),
+	Option('', '--set-portdir',
+		action='store_true',
+		dest='is_portdir',
+		help='Set this overlay as the main PORTDIR',
+		default=False),
+        Option('', '--force',
+                action='store_true',
+                dest='force',
+                help='Override config if overlay already exist',
+                default=False),
+	]
+options_rm = options_defaults
+options_sync = options_defaults
+
+options_actions = [
+	('', '--add', 'Add an overlay', options_add),
+	('', '--rm', 'Remove an overlay', options_rm),
+	('', '--list', 'List currenlty installed overlay', options_list),
+	('', '--sync', 'Synchronize overlay', options_sync),
+	]
+
+def action_parser_callback(option, opt_str, value, parser, *args, **kwargs):
+        sub_parser = OptionParser(usage = "%prog " + "%s [options]" % opt_str)
+	
+	setattr(parser.values, "action", option.get_opt_string()[2:])
+	if kwargs.get('opts'):
+		for opt in kwargs['opts']:
+			sub_parser.add_option(opt)
+
+	for key, val in sub_parser.defaults.iteritems():
+		if not hasattr(parser.values, key):
+			setattr(parser.values, key, val)
+
+	(parser.values, rargs) = sub_parser.parse_args(args=parser.rargs, values=parser.values)
+	del parser.rargs[:]
+	parser.rargs.extend(rargs)
+
+if __name__ == "__main__":
+	parser = OptionParser(usage = "%prog [action] [options]")
+	global_group = OptionGroup(parser, "Global options")
+	for ii in options_defaults:
+		global_group.add_option(ii)
+	parser.add_option_group(global_group)
+	action_group = OptionGroup(parser, "Actions", "")
+	for (short, long, help, sub_opts) in options_actions:
+		action_group.add_option(short, long,
+				help=help,
+				action='callback',
+				callback=action_parser_callback,
+				callback_kwargs={'opts': sub_opts})
+	parser.add_option_group(action_group)
+	(values, args) = parser.parse_args()
+	exe_name = os.path.basename(sys.argv[0])
+	cfg_dir = values.ensure_value('cfg_dir', None)
+	ov_dir = values.ensure_value('ov_dir', None)
+        if not cfg_dir:
+                if 'x' == exe_name[0]:
+                        cur_tgt = get_current_target()
+                        if cur_tgt:
+                                cfg_dir = cur_tgt + "/root/etc"
+                        else:
+                                die("No 'current' target, you need to use --cfg-dir option")
+                else:
+                        if os.environ.has_key('PORTAGE_CONFIGROOT'):
+                                cfg_dir = os.getenv('PORTAGE_CONFIGROOT') + '/etc'
+                        elif os.environ.has_key('ROOT'):
+                                cfg_dir = os.getenv('ROOT') + '/etc'
+                        else:
+                                cfg_dir = '/etc'
+        if not ov_dir:
+                if 'x' == exe_name[0]:
+                        ov_dir = '${ROOT}/../portage'
+                else:
+                        if os.environ.has_key('ROOT'):
+                                ov_dir = os.getenv('ROOT') + '../portage'
+                        else:
+                                ov_dir = '/usr/local/portage'
+	# create the xov object
+        stdout = None
+        stderr = None
+        if values.ensure_value('verbose', False):
+                verbose(True)
+                stdout = sys.stdout
+                stderr = sys.stderr
+        # ROOT is needed when syncing an overlay
+        root = os.getenv('ROOT', None)
+        if not root and 'x' == exe_name[0]:
+                cur_tgt = get_current_target()
+                if cur_tgt:
+                        root = cur_tgt + "/root/"
+	ov = Xov(cfg_dir, ov_dir, stdout, stderr, root)
+	if not values.ensure_value('action', None):
+		parser.print_help()
+	elif values.action == 'list':
+		ovs = ov.list()
+		ovs_keys = ovs.keys()
+		ovs_keys.sort()
+		for ii in ovs_keys:
+			info("%s" % ii)
+	elif values.action == 'add':
+		if not (args and len(args) == 1):
+			die("A name is required for --add action")
+		if values.ensure_value('xml', None):
+			warn("Not yet implemented")
+		if not values.ensure_value('uri', None):
+			die("--uri is required for --add action")
+		if not values.ensure_value('proto', None):
+			die("--proto is required for --add action")
+		if not values.ensure_value('rev', None) and not values.ensure_value('branch', None):
+			die("at least --rev or --branch required for --add action")
+		try:
+			ov.add(args[0], values.uri, values.proto,
+				values.ensure_value('rev', None),
+				values.ensure_value('branch', None),
+				values.is_portdir,
+                                values.ensure_value('force', False))
+		except XovError, e:
+			error("Adding %s failed" % args[0])
+			die("%s" % e)
+
+	elif values.action == 'rm':
+		if not (args and len(args) == 1):
+			die("A name is required for --rm action")
+		try:
+			ov.rm(args[0])
+		except XovError, e:
+			error("Removing %s failed" % args[0])
+			die("%s" % e)
+	elif values.action == 'sync':
+		if not (args and len(args) == 1):
+			die("A name is required for --sync action")
+		else:
+			try:
+				ov.sync(args[0])
+			except XovError, e:
+				error("Sync failed:")
