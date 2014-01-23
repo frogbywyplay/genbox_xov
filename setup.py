@@ -89,7 +89,7 @@ def find_packages(dir):
 
 setup(
     name = "xov",
-    version = "2.1.1",
+    version = "2.1.2",
     description = "Overlays tool management for genbox",
     author = "Wyplay",
     author_email = "noreply@wyplay.com",
