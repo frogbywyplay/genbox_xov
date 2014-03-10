@@ -39,7 +39,7 @@ class Xov(object):
 		self.cfg_dir = cfg_dir
 		self.ov_dir = ov_dir
 		self.ovs = {}
-		self.xov_re = re.compile('^source (?P<quote>[\'"]).*/xov.conf(?P=quote)$')
+		self.xov_re = re.compile('^source (?P<quote>[\'"]?).*/xov.conf(?P=quote)$')
 		self.config = XovConfig(cfg_dir, ov_dir)
 		if stdout:
 			self.stdout = stdout
