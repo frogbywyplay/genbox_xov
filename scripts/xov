@@ -19,6 +19,10 @@ options_defaults = [
 	Option('', '--ov-dir',
 		dest='ov_dir',
 		help='Path to store overlay'),
+	Option('-t', '--target',
+		action='store_true',
+		dest='targets',
+		help='Target overlays'),
 		]
 
 
@@ -95,8 +99,11 @@ if __name__ == "__main__":
 	exe_name = os.path.basename(sys.argv[0])
 	cfg_dir = values.ensure_value('cfg_dir', None)
 	ov_dir = values.ensure_value('ov_dir', None)
+	is_targets = values.ensure_value('targets', False)
         if not cfg_dir:
-                if 'x' == exe_name[0]:
+                if is_targets:
+                        cfg_dir = '/etc'
+                elif 'x' == exe_name[0]:
                         cur_tgt = get_current_target()
                         if cur_tgt:
                                 cfg_dir = cur_tgt + "/root/etc"
@@ -110,7 +117,10 @@ if __name__ == "__main__":
                         else:
                                 cfg_dir = '/etc'
         if not ov_dir:
-                if 'x' == exe_name[0]:
+                if is_targets:
+                        from xtarget.builder import XTargetBuilder
+                        ov_dir = XTargetBuilder().cfg['ov_path']
+                elif 'x' == exe_name[0]:
                         ov_dir = '${ROOT}/../portage'
                 else:
                         if os.environ.has_key('ROOT'):
@@ -130,7 +140,7 @@ if __name__ == "__main__":
                 cur_tgt = get_current_target()
                 if cur_tgt:
                         root = cur_tgt + "/root/"
-	ov = Xov(cfg_dir, ov_dir, stdout, stderr, root)
+	ov = Xov(cfg_dir, ov_dir, stdout, stderr, root, is_targets)
 	if not values.ensure_value('action', None):
 		parser.print_help()
 	elif values.action == 'list':
@@ -138,7 +148,7 @@ if __name__ == "__main__":
 		ovs_keys = ovs.keys()
 		ovs_keys.sort()
 		for ii in ovs_keys:
-			info("%s" % ii)
+			info(str(ovs[ii]) if is_verbose() else ii)
 	elif values.action == 'add':
 		if not (args and len(args) == 1):
 			die("A name is required for --add action")

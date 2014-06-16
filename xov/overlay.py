@@ -43,7 +43,9 @@ class Overlay(object):
                 if protocol:
                     self.protocol = protocol
                 
-        
+        def __str__(self):
+            return "Overlay(uri=%r, protocol=%r, revision=%r, branch=%r, name=%r, is_portdir=%r)" % \
+                        (self.uri, self._protocol, self.revision, self.branch, self.name, self.portdir)
         def get_protocol(self):
             return self._protocol
         def set_protocol(self, val):

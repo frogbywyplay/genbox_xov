@@ -21,6 +21,7 @@ import exceptions
 import os
 import re
 import overlay
+import xtarget
 
 class XovConfigError(exceptions.Exception):
 	"""Error class to Xov."""
@@ -33,9 +34,9 @@ class XovConfigError(exceptions.Exception):
 			return ""
 
 class XovConfig(object):
-	def __init__(self, cfg_dir, ov_dir):
+	def __init__(self, cfg_dir, ov_dir, is_targets=False):
 		self.cfg_dir = cfg_dir
-		self.cfg_file = self.cfg_dir + '/xov.conf'
+		self.cfg_file = self.cfg_dir + (xtarget.consts.XTARGET_SYS_OV_CFG[4:] if is_targets else '/xov.conf')
 		self.ov_dir = ov_dir
 		self.ov_re = re.compile('^PORTAGE_(.*)_(.*)="(.*)"$')
 		self.portdir_re = re.compile(r'^\s*PORTDIR\s*=\s*(?P<dbl>\")(?P<value>(?:[^\\"]|\\.)*)(?(dbl)\")')
